@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -11,36 +12,34 @@ export async function POST(req: NextRequest) {
   }
 
   const { name, email, company, message } = body ?? {};
-
   const errors: Record<string, string> = {};
 
-  if (!name || typeof name !== "string" || name.trim().length < 2) {
+  if (!name || typeof name !== "string" || name.trim().length < 2)
     errors.name = "Enter a name with at least 2 characters.";
-  }
-  if (!email || typeof email !== "string" || !EMAIL_RE.test(email.trim())) {
+  if (!email || typeof email !== "string" || !EMAIL_RE.test(email.trim()))
     errors.email = "Enter a valid email address.";
-  }
-  if (!message || typeof message !== "string" || message.trim().length < 10) {
+  if (!message || typeof message !== "string" || message.trim().length < 10)
     errors.message = "Message should be at least 10 characters.";
-  }
-  if (company && typeof company !== "string") {
-    errors.company = "Invalid company value.";
-  }
 
-  if (Object.keys(errors).length > 0) {
+  if (Object.keys(errors).length > 0)
     return NextResponse.json({ errors }, { status: 422 });
-  }
 
-  // In production: send an email (e.g. via Resend/SendGrid) or write to a
-  // database/CRM here. Kept as a stub so this works with zero external
-  // services configured.
-  console.log("New Newbizz contact submission:", {
-    name,
-    email,
-    company,
-    message,
-    receivedAt: new Date().toISOString(),
-  });
+  try {
+    await prisma.contactSubmission.create({
+      data: {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        company: company?.trim() || null,
+        message: message.trim(),
+      },
+    });
+  } catch (err) {
+    console.error("Failed to save contact submission:", err);
+    return NextResponse.json(
+      { error: "Something went wrong. Please try again." },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ ok: true }, { status: 200 });
 }
